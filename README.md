@@ -1,7 +1,7 @@
 Check Sky Objects
 =================
 
-Plots objects coordinates at the Horizontal Coordinate System (Alt, Az) at a certain location and time. For different timezones, see [https://en.wikipedia.org/wiki/List_of_tz_database_time_zones].
+Plots objects coordinates at the Horizontal Coordinate System (Alt, Az) at a certain location and time. [Click for more timezones](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones).
 
 The jupyter-notebook script help us to inspect the code at [Google Colab](https://colab.research.google.com/github/elacerda/check_sky_objects/blob/main/check_sky_objects.ipynb) directly from the repository.
 
@@ -13,20 +13,14 @@ In order to run this notebook, you will need python 3.9 or higher for the [zonei
 Usage
 -----
 
-Script
-^^^^^^
-
-Run:
+For the script [check_sky_objects.py](check_sky_objects.py) run:
 
     $./check_sky_objects.py CONFIG_FILENAME
     
 
 See the [configuration file](config.ini) for more information about how to configure the script.
 
-Notebook
-^^^^^^^^
-
-For the correct calculation of the positions at a certain location, one should configure the correct site GPS coordinates at the function `get_myhome_location_and_time()`:
+The notebook [check_sky_objects.ipynb](check_sky_objects.ipynb) should be configured for the correct calculation of the positions at a certain location. For this one should configure the correct site GPS coordinates at the function `get_myhome_location_and_time()`:
 
 ```python
 def get_myhome_location_and_time():
