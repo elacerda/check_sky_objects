@@ -14,12 +14,22 @@ from matplotlib.dates import DateFormatter
 from astropy.coordinates import AltAz, EarthLocation, SkyCoord, Angle, get_sun, get_moon, SkyCoord
 
 __script_name__ = basename(sys.argv[0])
-__defulat__ = 'deg'
-__defulon__ = 'deg'
-__t80slat__ = -30.1678639
-__t80slon__ = -70.8056889
+__t80slat__ = '-30.1678639,deg'
+__t80slon__ = '-70.8056889,deg'
 __t80shei__ = 2187
 __t80stz__ = 'America/Santiago'
+
+def get_config(filename):
+    config = configparser.ConfigParser(
+        # allow a variables be set without value
+        allow_no_value=True,
+        # allows duplicated keys in different sections
+        strict=False,
+        # deals with variables inside configuratio file
+        interpolation=configparser.ExtendedInterpolation())
+    config.optionxform = str
+    config.read(filename)
+    return config
 
 def get_earth_location_and_Time(latitude, longitude, height, location_dt):
     # SET EARTH LOCATION
@@ -51,38 +61,38 @@ def get_location_moon_illumination(location_time):
     return moon_illumination
 
 def get_location_latlon(config):
-    uconf = config['units']
     lconf = config['location']
-    ulat = u.Unit(uconf.get('loc_lat_unit', __defulat__))
-    ulon = u.Unit(uconf.get('loc_lat_unit', __defulon__))
-    llat = lconf.getfloat('lat', __t80slat__)
-    llon = lconf.getfloat('lon', __t80slon__)
+    llat, ulat = lconf.get('lat', __t80slat__).split(',')
+    llon, ulon = lconf.get('lon', __t80slon__).split(',')
+    ulat = u.Unit(ulat)
+    ulon = u.Unit(ulon)
     return Angle(llat, unit=ulat), Angle(llon, unit=ulon)
 
-def get_config(filename):
-    config = configparser.ConfigParser(
-        # allow a variables be set without value
-        allow_no_value=True,
-        # allows duplicated keys in different sections
-        strict=False,
-        # deals with variables inside configuratio file
-        interpolation=configparser.ExtendedInterpolation())
-    config.optionxform = str
-    config.read(filename)
-    return config
-
 def get_objects(config):
-    uconf = config['units']
-    ura = u.Unit(uconf.get('obj_ra_unit', __defulat__))
-    udec = u.Unit(uconf.get('obj_dec_unit', __defulon__))
     oconf = config['objects']
     objects = {}
     for name, coords in oconf.items():
-        print(name, coords)
-        sRA, sDEC = coords.split(',')
-        ra = Angle(sRA, unit=ura)
-        dec = Angle(sDEC, unit=udec) 
-        objects[name] = {'ra': ra, 'dec': dec}
+        _ra, ura, _dec, udec = coords.split(',')
+        objects[name] = {
+            'ra': Angle(_ra, unit=u.Unit(ura)), 
+            'dec': Angle(_dec, unit=u.Unit(udec)),
+        }
+    return objects
+
+def get_objects_from_file(filename):
+    objects = {}
+    with open(filename) as f:
+        lines = f.readlines()
+        for l in lines:
+            if not l.startswith('#'):
+                try:
+                    name, _ra, ura, _dec, udec = l.strip().split(',')
+                    objects[name] = {
+                        'ra': Angle(_ra, unit=u.Unit(ura)), 
+                        'dec': Angle(_dec, unit=u.Unit(udec)),
+                    }
+                except:
+                    pass
     return objects
 
 if __name__ == '__main__':
@@ -112,11 +122,15 @@ if __name__ == '__main__':
     end_time_ref = config['datetime'].getint('end_time_ref', 24)
 
     #### objects
-    objects = get_objects(config)
+    objects_file = config['general'].get('objects_file', None)
+    if objects_file is None:
+        objects = get_objects(config)
+    else:
+        objects = get_objects_from_file(objects_file)
 
     lcoords, lTime = get_earth_location_and_Time(llat, llon, lhei, ldt)
     print('Location Earth Coordinates: ', lcoords)
-    print('Location Time: ', lTime)  # Time displays UTC ?
+    print('Location Time: ', lTime.to_datetime(timezone=ltz))
 
     obstime, l_AltAz_obstime, _time_lapse = create_location_AltAz_timeline(
         begin_time_ref=begin_time_ref, 
@@ -173,6 +187,7 @@ if __name__ == '__main__':
     ax2.fill_between(time_lapse, 0, 360, mask_twilight, color='0.6', zorder=0)
     ax2.axhline(y=0, ls='--', color='k')
     ax2.legend(frameon=False, loc=1)
+    ax2.set_ylabel('Azimuth [deg]')
 
     ax3.fill_between(time_lapse, 0, 360, mask_night, color='0.8', zorder=0)
     ax3.fill_between(time_lapse, 0, 360, mask_twilight, color='0.6', zorder=0)
@@ -181,7 +196,7 @@ if __name__ == '__main__':
 
     # PLOT OBJECTS
     n_obj = len(objects)
-    cmap_key = config['plot'].get('objects_colormap', 'magma')
+    cmap_key = config['general'].get('objects_colormap', 'magma')
     cmap_norm = Normalize(vmin=0, vmax=n_obj-1)
     for i, (k, v) in enumerate(objects.items()):
         _c = colormaps[cmap_key](cmap_norm(i))
@@ -213,8 +228,8 @@ if __name__ == '__main__':
         ax.legend(frameon=False, loc=1)
         ax.grid()
 
-    _dpi = config["plot"].getint("image_dpi", 100)
-    _imext = config["plot"].get("image_extention", "png")
+    _dpi = config['general'].getint('image_dpi', 100)
+    _imext = config['general'].get('image_extention', 'png')
     _plot_filename = f'location_sky.{_imext}'
     f.tight_layout()
     f.savefig(_plot_filename, dpi=_dpi)
