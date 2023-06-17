@@ -3,7 +3,7 @@ import sys
 import numpy as np
 import configparser
 import astropy.units as u
-from os.path import basename
+from os.path import basename, join
 from zoneinfo import ZoneInfo
 from astropy.time import Time
 from matplotlib import colormaps
@@ -11,7 +11,8 @@ from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
 from datetime import datetime, timedelta
 from matplotlib.dates import DateFormatter
-from astropy.coordinates import AltAz, EarthLocation, SkyCoord, Angle, get_sun, get_moon, SkyCoord
+from matplotlib.ticker import MultipleLocator, MaxNLocator
+from astropy.coordinates import AltAz, EarthLocation, SkyCoord, Angle, get_body, SkyCoord
 
 __script_name__ = basename(sys.argv[0])
 __t80slat__ = '-30.1678639,deg'
@@ -45,13 +46,13 @@ def create_location_AltAz_timeline(begin_time_ref, end_time_ref, location_time, 
     return location_timeline, location_timeline_AltAz, timeline
 
 def create_sun_and_moon_location_AltAz_timeline(location_timeline, location_timeline_AltAz):
-    sun_location_AltAz_timeline = get_sun(location_timeline).transform_to(location_timeline_AltAz)
-    moon_location_AltAz_obstime = get_moon(location_timeline).transform_to(location_timeline_AltAz)
+    sun_location_AltAz_timeline = get_body('sun', time=location_timeline).transform_to(location_timeline_AltAz)
+    moon_location_AltAz_obstime = get_body('moon', time=location_timeline).transform_to(location_timeline_AltAz)
     return sun_location_AltAz_timeline, moon_location_AltAz_obstime
 
 def get_location_moon_illumination(location_time):
-    sun = get_sun(location_time)
-    moon = get_moon(location_time)
+    sun = get_body('sun', time=location_time)
+    moon = get_body('moon', time=location_time)
     elongation = sun.separation(moon)
     moon_phase_angle = np.arctan2(
         sun.distance*np.sin(elongation), 
@@ -104,6 +105,9 @@ if __name__ == '__main__':
 
     config = get_config(config_file)
 
+    output_directory = config['general'].get('output_directory', '.')
+    output_filename_prefix = config['general'].get('output_filename_prefix', 'location')
+
     #### location
     llat, llon = get_location_latlon(config)
     lhei = config['location'].getfloat('hei', __t80shei__)*u.m
@@ -116,7 +120,8 @@ if __name__ == '__main__':
          ldt = datetime.now(tz=ltz)
     else:
         ldt = datetime.strptime(ldt, dtfmt).astimezone(ltz)
-
+    _dt_prefix = ldt.strftime('%Y%m%d%H%M%S')
+    
     #### timeline
     begin_time_ref = config['datetime'].getint('begin_time_ref', 0)
     end_time_ref = config['datetime'].getint('end_time_ref', 24)
@@ -230,6 +235,7 @@ if __name__ == '__main__':
 
     _dpi = config['general'].getint('image_dpi', 100)
     _imext = config['general'].get('image_extention', 'png')
-    _plot_filename = f'location_sky.{_imext}'
+    _plot_filename = join(output_directory, f'{_dt_prefix}-{output_filename_prefix}_sky.{_imext}')
+    print(_plot_filename)
     f.tight_layout()
     f.savefig(_plot_filename, dpi=_dpi)
